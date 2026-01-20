@@ -123,6 +123,7 @@ app.include_router(auth_router.router)
 app.include_router(residents_router.router)
 
 # Also expose canonical API routes under /api to match the frontend implementation.
+# This prevents 404s when the frontend is configured to call `/api/...`.
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(residents_router.router, prefix="/api")
 
