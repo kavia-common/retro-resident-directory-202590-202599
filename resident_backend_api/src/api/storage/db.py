@@ -5,18 +5,37 @@ import sqlite3
 from contextlib import contextmanager
 from typing import Generator
 
-from src.api.utils.errors import APIError
+
 
 
 def _get_db_path() -> str:
-    # Environment variable is provided by the database container orchestration.
+    """
+    Resolve the SQLite DB file path.
+
+    Primary source:
+      - SQLITE_DB env var (provided by the database container orchestration)
+
+    Fallback:
+      - Use the known database workspace file if SQLITE_DB is missing. This
+        improves local/dev robustness during multi-container integration.
+
+    Notes:
+      - If SQLITE_DB is a relative path, resolve it relative to the current
+        working directory.
+    """
     db_path = os.getenv("SQLITE_DB")
-    if not db_path:
-        raise APIError(
-            status_code=500,
-            code="db_not_configured",
-            message="Database not configured (missing SQLITE_DB env var).",
-        )
+
+    # Fallback path discovered from database container's db_connection.txt
+    fallback_path = "/home/kavia/workspace/code-generation/retro-resident-directory-202590-202600/database/myapp.db"
+
+    if not db_path or db_path.strip() == "":
+        db_path = fallback_path
+
+    db_path = db_path.strip()
+
+    if not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
+
     return db_path
 
 

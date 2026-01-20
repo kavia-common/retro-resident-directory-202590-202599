@@ -10,6 +10,8 @@ Provides:
 
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -63,9 +65,24 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
     )
 
 
+def _get_allowed_origins() -> list[str]:
+    """
+    Compute CORS allowed origins from environment.
+
+    Environment variables:
+      - CORS_ALLOW_ORIGINS: comma-separated list of allowed origins.
+        Example: "http://localhost:3000,https://myapp.example.com"
+      If unset/empty, defaults to ["*"] to simplify local/dev usage.
+    """
+    raw = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
+    if not raw:
+        return ["*"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Frontend URL may vary in hosted environments.
+    allow_origins=_get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -90,5 +107,10 @@ def auth_usage_help() -> dict:
     }
 
 
+# Keep existing routes (e.g., /auth/*, /residents/*) for backward compatibility.
 app.include_router(auth_router.router)
 app.include_router(residents_router.router)
+
+# Also expose canonical API routes under /api to match the frontend implementation.
+app.include_router(auth_router.router, prefix="/api")
+app.include_router(residents_router.router, prefix="/api")
