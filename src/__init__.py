@@ -25,10 +25,13 @@ from pkgutil import extend_path
 # Allow `src` to be a namespace package spanning multiple locations.
 __path__ = extend_path(__path__, __name__)  # type: ignore[name-defined]
 
-# Compute backend src path relative to this file:
-# .../retro-resident-directory-202590-202599/src/__init__.py -> parent is workspace
-workspace_root = Path(__file__).resolve().parents[2]
-backend_src = workspace_root / "retro-resident-directory-202590-202599" / "resident_backend_api" / "src"
+# Compute backend src path relative to this file.
+# This shim lives inside the workspace folder itself:
+#   .../retro-resident-directory-202590-202599/src/__init__.py
+# So the backend src should be at:
+#   .../retro-resident-directory-202590-202599/resident_backend_api/src
+workspace_root = Path(__file__).resolve().parents[1]
+backend_src = workspace_root / "resident_backend_api" / "src"
 
 if backend_src.is_dir():
     backend_src_str = str(backend_src)
