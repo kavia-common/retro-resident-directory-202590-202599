@@ -6,6 +6,17 @@ Provides:
 - Authentication (token-based) with admin authorization
 - Residents CRUD and search/filter endpoints backed by SQLite
 - Consistent error handling and OpenAPI documentation metadata
+
+Startup robustness note:
+Some preview/runtime environments may execute the backend using system Python and
+may not inject environment variables from `.env`. To ensure the service still
+binds to the expected port (3001) and is reachable from outside the container,
+this module also supports being executed directly:
+
+    python -m src.api.main
+    python src/api/main.py
+
+In those modes, we load `.env` if present and start Uvicorn programmatically.
 """
 
 from __future__ import annotations
@@ -114,3 +125,49 @@ app.include_router(residents_router.router)
 # Also expose canonical API routes under /api to match the frontend implementation.
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(residents_router.router, prefix="/api")
+
+
+def _env_int(name: str, default: int) -> int:
+    """Parse an int env var with a default fallback."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _env_str(name: str, default: str) -> str:
+    """Parse a string env var with a default fallback."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    return raw
+
+
+if __name__ == "__main__":
+    # When the platform uses "python src/api/main.py" as the entrypoint, Uvicorn
+    # is never started unless we do it explicitly. Additionally, env vars may not
+    # be injected; load `.env` if present.
+    try:
+        from dotenv import load_dotenv  # type: ignore
+
+        load_dotenv()
+    except Exception:
+        # If python-dotenv isn't available for some reason, proceed without it.
+        pass
+
+    import uvicorn
+
+    host = _env_str("UVICORN_HOST", _env_str("HOST", "0.0.0.0"))
+    port = _env_int("PORT", 3001)
+
+    # Use an import string so Uvicorn can resolve the ASGI app in a consistent way.
+    uvicorn.run(
+        "src.api.main:app",
+        host=host,
+        port=port,
+        workers=_env_int("UVICORN_WORKERS", 1),
+        proxy_headers=_env_str("TRUST_PROXY", "false").lower() in {"1", "true", "yes"},
+    )
